@@ -1,0 +1,579 @@
+============================================================
+1. LOADING DATA
+============================================================
+Train shape : (12319040, 17)
+Test  shape : (204568, 16)
+Train columns: ['region_id', 'date', 'prec', 'surf_pre', 'humidity', 'tmp', 'dp_tmp', 'wb_tmp', 'tmp_max', 'tmp_min', 'tmp_range', 'surf_tmp', 'wind', 'wind_max', 'wind_min', 'wind_range', 'score']
+Test  columns: ['region_id', 'date', 'prec', 'surf_pre', 'humidity', 'tmp', 'dp_tmp', 'wb_tmp', 'tmp_max', 'tmp_min', 'tmp_range', 'surf_tmp', 'wind', 'wind_max', 'wind_min', 'wind_range']
+------------------------------------------------------------
+CONCLUSION: Dataset loaded successfully. Train has 17 columns including the target 'score'; test has 16 columns (no score). Both share the same 14 meteorological features.
+------------------------------------------------------------
+
+============================================================
+2. DATE ANALYSIS
+============================================================
+Train date range (raw): 10004-12-31 -> 8133-12-31
+Test  date range (raw): 10021-08-12  -> 8135-04-28
+NOTE: Years are outside pandas datetime range — extracting parts from string.
+Year  range (train): 3004 -> 58061
+Month distribution (train):
+month
+1     1045320
+2      953152
+3     1045320
+4     1011600
+5     1045320
+6     1011600
+7     1045320
+8     1045320
+9     1011600
+10    1045320
+11    1011600
+12    1047568
+------------------------------------------------------------
+CONCLUSION: Years like 3004-58061 are fictional and far outside pandas datetime64 range. We parse date parts manually using string splitting and compute day_of_week via Julian Day Number formula. The 'year' column cannot be used as a feature since it is arbitrary per region. Useful temporal features are: month (seasonality) and day_of_week (computed via JDN).
+------------------------------------------------------------
+
+============================================================
+3. REGION ANALYSIS
+============================================================
+Train regions : 2248
+Test  regions : 2248
+
+Train rows per region:
+count    2248.0
+mean     5480.0
+std         0.0
+min      5480.0
+25%      5480.0
+50%      5480.0
+75%      5480.0
+max      5480.0
+
+Test  rows per region:
+count    2248.0
+mean       91.0
+std         0.0
+min        91.0
+25%        91.0
+50%        91.0
+75%        91.0
+max        91.0
+
+Regions with full 5480 days : 2248
+Regions with fewer days      : 0
+Saved: 01_region_row_counts.png
+------------------------------------------------------------
+CONCLUSION: Dataset is perfectly balanced: all 2,248 regions have exactly 5,480 days in train and exactly 91 days in test. No missing regions, no truncated timeseries. All 2,248 test regions also exist in train, meaning we can always look up historical data for any region in test.
+------------------------------------------------------------
+
+============================================================
+4. SCORE (LABEL) ANALYSIS
+============================================================
+Rows with score    : 1,757,936  (14.3%)
+Rows without score : 10,561,104
+
+Score stats:
+count    1.757936e+06
+mean     8.356595e-01
+std      1.261490e+00
+min      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      1.000000e+00
+max      5.000000e+00
+
+Score distribution:
+score
+0.0    1048333
+1.0     303432
+2.0     186279
+3.0     118496
+4.0      69422
+5.0      31974
+
+Score distribution (%):
+score
+0.0    59.63
+1.0    17.26
+2.0    10.60
+3.0     6.74
+4.0     3.95
+5.0     1.82
+Saved: 02_score_distribution.png
+------------------------------------------------------------
+CONCLUSION: Score is heavily imbalanced: 59.6% of weeks have score=0 (no drought). A naive model that always predicts 0 would achieve MAE ~0.84, which already beats Baseline 1 (0.9117). This imbalance means the model must be carefully designed to avoid always predicting 0. Class weighting or loss adjustment may be needed to properly predict drought weeks (score >= 1).
+------------------------------------------------------------
+
+============================================================
+5. MISSING VALUE ANALYSIS
+============================================================
+
+Train missing values:
+score    10561104
+
+Test  missing values:
+Series([], )
+
+Meteo feature missing % (train):
+prec          0.0
+surf_pre      0.0
+humidity      0.0
+tmp           0.0
+dp_tmp        0.0
+wb_tmp        0.0
+tmp_max       0.0
+tmp_min       0.0
+tmp_range     0.0
+surf_tmp      0.0
+wind          0.0
+wind_max      0.0
+wind_min      0.0
+wind_range    0.0
+Saved: 03_missing_values.png
+------------------------------------------------------------
+CONCLUSION: All 14 meteorological features have zero missing values in both train and test. The only missing column is 'score' (85.7% NaN in train), which is by design — score is recorded once per week, not daily. No imputation is needed for features. This is a very clean dataset from a data quality perspective.
+------------------------------------------------------------
+
+============================================================
+6. METEOROLOGICAL FEATURE STATS
+============================================================
+
+                 count       mean        std    min    25%    50%    75%     max
+prec        12319040.0   2.563559   6.215294   0.00   0.00   0.14   2.02  243.32
+surf_pre    12319040.0  95.936407   6.024206  66.12  94.50  97.86  99.89  104.32
+humidity    12319040.0   7.799983   4.728641   0.12   3.77   6.76  11.32   22.92
+tmp         12319040.0  12.949157  10.964134 -37.34   4.68  14.20  22.05   41.39
+dp_tmp      12319040.0   6.781904  10.267199 -37.70  -1.18   7.28  15.45   27.55
+wb_tmp      12319040.0   6.817224  10.196349 -37.46  -1.15   7.28  15.44   27.55
+tmp_max     12319040.0  18.882389  11.563819 -32.20  10.56  20.67  28.08   50.03
+tmp_min     12319040.0   7.537493  10.639241 -45.96  -0.54   8.18  16.26   33.80
+tmp_range   12319040.0  11.344899   4.053179   0.02   8.44  11.30  14.19   34.61
+surf_tmp    12319040.0  13.068181  11.235230 -37.19   4.57  14.27  22.30   43.85
+wind        12319040.0   3.646797   1.879692   0.25   2.20   3.25   4.71   24.94
+wind_max    12319040.0   5.342148   2.656599   0.54   3.24   4.85   6.93   36.28
+wind_min    12319040.0   1.948686   1.371303   0.00   0.95   1.68   2.63   17.20
+wind_range  12319040.0   3.393461   1.987169   0.20   1.90   2.94   4.42   28.25
+Saved: 04_feature_distributions.png
+------------------------------------------------------------
+CONCLUSION: Temperature features (tmp, tmp_max, tmp_min, surf_tmp, dp_tmp, wb_tmp) span wide ranges (-45 to +50 deg C), suggesting the dataset covers diverse climatic regions. Precipitation (prec) is heavily right-skewed (median=0.14, max=243), typical for rainfall data. dp_tmp and wb_tmp are very close in distribution — likely collinear. Normalization will be needed before feeding into distance-based models.
+------------------------------------------------------------
+
+============================================================
+7. FEATURE-SCORE CORRELATIONS
+============================================================
+
+Pearson correlation with score:
+surf_pre     -0.155524
+prec         -0.060676
+dp_tmp       -0.056445
+wb_tmp       -0.055573
+humidity     -0.052438
+wind_min     -0.008650
+wind          0.028685
+wind_max      0.050209
+tmp_min       0.060863
+wind_range    0.072626
+tmp           0.094285
+surf_tmp      0.102556
+tmp_max       0.133983
+tmp_range     0.221477
+
+Spearman correlation with score:
+surf_pre     -0.134550
+prec         -0.109325
+dp_tmp       -0.068208
+wb_tmp       -0.067686
+humidity     -0.056190
+wind_min     -0.011406
+wind          0.036693
+tmp_min       0.046362
+wind_max      0.059059
+tmp           0.082282
+wind_range    0.088589
+surf_tmp      0.089694
+tmp_max       0.125191
+tmp_range     0.221948
+Saved: 05_feature_score_correlation.png
+------------------------------------------------------------
+CONCLUSION: No single feature strongly predicts score — the highest is tmp_range at 0.222 (Spearman), followed by surf_pre at -0.135 and tmp_max at 0.125. All others below 0.11. Spearman > Pearson for most features, indicating nonlinear relationships. Linear regression is unsuitable; tree-based models (LightGBM, XGBoost) are strongly preferred. Feature combinations and lag features will matter far more than any individual raw feature.
+------------------------------------------------------------
+
+============================================================
+8. FEATURE CORRELATION MATRIX
+============================================================
+Saved: 06_correlation_heatmap.png
+------------------------------------------------------------
+CONCLUSION: Strong multicollinearity among temperature features: tmp, surf_tmp, tmp_max, tmp_min, dp_tmp, wb_tmp are all highly correlated. Keeping all adds redundancy. Recommended: keep tmp, tmp_range, dp_tmp as representatives; drop wb_tmp (nearly identical to dp_tmp). Wind features carry independent signal.
+------------------------------------------------------------
+
+============================================================
+9. SCORE VS KEY FEATURES
+============================================================
+Saved: 07_score_vs_features_boxplot.png
+------------------------------------------------------------
+CONCLUSION: Feature medians shift gradually with score level but distributions heavily overlap across all score levels — no single feature cleanly separates drought severity. prec and humidity trend slightly down at higher scores; tmp trends up. Model must rely on feature combinations rather than any single threshold.
+------------------------------------------------------------
+
+============================================================
+10. TEMPORAL PATTERNS
+============================================================
+
+Avg score by month:
+month
+1     0.855945
+2     0.827291
+3     0.802279
+4     0.810823
+5     0.746938
+6     0.752502
+7     0.899183
+8     0.936727
+9     0.893530
+10    0.858757
+11    0.833431
+12    0.808767
+
+Avg score by day of week:
+day_of_week
+0    0.827406
+1    0.847385
+2    0.846517
+3    0.827732
+4    0.859227
+5    0.835437
+6    0.806533
+Saved: 08_temporal_patterns.png
+------------------------------------------------------------
+CONCLUSION: Seasonal signal exists but is weak: monthly mean score varies only 0.75-0.94 (range of 0.19). Jul-Sep trend slightly higher. Day of week is completely flat (0.80-0.86) — no predictive value, drop as feature. Month will be kept but expected to contribute minimally on its own.
+------------------------------------------------------------
+
+============================================================
+11. SCORE AUTOCORRELATION (sample regions)
+============================================================
+Mean autocorrelation by lag (weeks 1-20):
+  Lag  1: 0.9360
+  Lag  2: 0.8708
+  Lag  3: 0.8059
+  Lag  4: 0.7416
+  Lag  5: 0.6790
+  Lag  6: 0.6197
+  Lag  7: 0.5608
+  Lag  8: 0.5091
+  Lag  9: 0.4612
+  Lag 10: 0.4166
+  Lag 11: 0.3753
+  Lag 12: 0.3407
+  Lag 13: 0.3086
+  Lag 14: 0.2776
+  Lag 15: 0.2482
+  Lag 16: 0.2175
+  Lag 17: 0.1853
+  Lag 18: 0.1519
+  Lag 19: 0.1178
+  Lag 20: 0.0865
+
+Score transition matrix (normalized, sample 200 regions):
+       0.0    1.0    2.0    3.0    4.0    5.0
+0.0  0.961  0.039  0.001  0.000  0.000  0.000
+1.0  0.086  0.861  0.053  0.000  0.000  0.000
+2.0  0.004  0.059  0.887  0.049  0.000  0.000
+3.0  0.001  0.005  0.058  0.901  0.036  0.000
+4.0  0.000  0.001  0.005  0.058  0.912  0.023
+5.0  0.000  0.000  0.000  0.003  0.033  0.963
+Saved: 09_autocorr_transitions.png
+------------------------------------------------------------
+CONCLUSION: Most important finding in the entire EDA. Lag-1 autocorrelation = 0.936 — last week's score is an extremely strong predictor. Lag-5 (furthest prediction target) = 0.679, still very high. Transition matrix confirms drought is persistent: score stays the same ~90% of the time week-to-week. The last known score before the prediction window is the single most valuable feature. Lag score features at lags 1-4 should be the top priority in feature engineering.
+------------------------------------------------------------
+
+============================================================
+12. REGION VARIABILITY
+============================================================
+
+Per-region score stats:
+              mean          std          max
+count  2248.000000  2248.000000  2248.000000
+mean      0.835660     1.108992     4.221975
+std       0.476265     0.369557     0.889096
+min       0.084399     0.278163     1.000000
+25%       0.448529     0.833240     4.000000
+50%       0.740409     1.096988     4.000000
+75%       1.205882     1.413451     5.000000
+max       2.255754     2.033416     5.000000
+Saved: 10_region_variability.png
+------------------------------------------------------------
+CONCLUSION: Regions have very different drought baselines: per-region mean score ranges from 0.08 (almost never drought) to 2.26 (frequently severe). A global model without region-level information will struggle. Recommended: include per-region historical mean score as a feature (region baseline). This encodes each region's long-term drought tendency and should significantly improve predictions.
+------------------------------------------------------------
+
+============================================================
+13. SAMPLE TIME SERIES PLOTS
+============================================================
+Saved: 11_sample_time_series.png (region R1)
+------------------------------------------------------------
+CONCLUSION: Drought score is persistent and changes slowly, consistent with high autocorrelation. Precipitation spikes do not always immediately reduce score — there is a delayed response. Rolling aggregates over multiple weeks (e.g. 4-week cumulative rainfall) will be more predictive than single-day precipitation values.
+------------------------------------------------------------
+
+============================================================
+14. TRAIN vs TEST DATE OVERLAP
+============================================================
+Test regions also in train : 2248
+Test regions not in train  : 0
+
+Date continuity check (sample 5 regions):
+  R167: train ends 8037-12-31, test starts 8039-07-15
+  R710: train ends 20111-12-31, test starts 20112-07-03
+  R407: train ends 15117-12-31, test starts 15118-04-24
+  R2188: train ends 43045-12-31, test starts 43047-07-29
+  R2057: train ends 41113-12-31, test starts 41115-07-15
+------------------------------------------------------------
+CONCLUSION: All 2,248 test regions exist in train — no cold-start problem. We can always retrieve each region's full training history. Region-level features (historical mean score, historical feature stats) can be computed from train and used for test prediction.
+------------------------------------------------------------
+
+============================================================
+15. WEEKLY AGGREGATION PREVIEW
+============================================================
+
+Weekly aggregated table shape: (782, 9)
+Sample (first 5 rows):
+         score  prec_sum  prec_mean  humidity        tmp  tmp_max  tmp_min    dp_tmp      wind
+week_id                                                                                       
+0          0.0     17.64   2.520000  7.640000  10.762857    22.85    -4.29  8.154286  2.341429
+1          0.0      9.41   1.344286  3.637143   1.952857    15.79    -7.23 -1.315714  1.887143
+2          0.0     15.56   2.222857  5.311429   6.785714    16.66    -5.89  3.288571  2.491429
+3          0.0     24.94   3.562857  5.712857   7.435714    18.99    -4.00  3.988571  2.447143
+4          0.0      2.39   0.341429  3.820000   4.124286    11.86    -6.46 -0.442857  2.328571
+------------------------------------------------------------
+CONCLUSION: Weekly aggregation produces 782 rows per region — one row per scored week. This is the correct modeling unit. prec_sum (weekly total rainfall) is more meaningful than daily prec for drought prediction. Reduces dataset from 12.3M rows to ~1.76M rows while preserving all signal.
+------------------------------------------------------------
+
+============================================================
+16. DATE INFERENCE — CAN WE RECOVER REAL YEAR?
+============================================================
+
+Start date per region (sample 10):
+                  date   year  month  day  day_of_week
+region_id                                             
+R1          3004-12-31   3004     12   31            0
+R1001      23086-12-31  23086     12   31            4
+R1002      23088-12-31  23088     12   31            0
+R1005      23094-12-31  23094     12   31            0
+R1006      23096-12-31  23096     12   31            3
+R1007      23098-12-31  23098     12   31            5
+R1009      23102-12-31  23102     12   31            2
+R1011      23106-12-31  23106     12   31            0
+R1012      23108-12-31  23108     12   31            3
+R1014      23112-12-31  23112     12   31            1
+
+Start month distribution:
+month
+12    2248
+
+Start day distribution:
+day
+31    2248
+
+Start day_of_week distribution:
+day_of_week
+0    359
+1    296
+2    345
+3    305
+4    316
+5    327
+6    300
+
+Unique (month, day) combinations at start: 1
+Common start: month=12, day=31
+
+Total regions  : 2248
+Unique years   : 2248
+All years unique: True
+Year range     : 3004 -> 58046
+
+Year gap between consecutive regions:
+  Mean: 8.94, Std: 13796.79, Min: -54964, Max: 43988
+Saved: 12_region_start_years.png
+------------------------------------------------------------
+CONCLUSION: All regions share the same start date (Dec 31) but every region has a completely unique year (2,248 regions = 2,248 unique years, range 3004-58046). Year gaps between regions are random (std=13,796, min=-54,964, max=+43,988). The shared Dec 31 start is a dataset design choice, NOT evidence of a real year. VERDICT: Real year cannot be inferred. The 'year' column must be dropped entirely. Month and day are still usable for seasonality since they are consistent.
+------------------------------------------------------------
+
+============================================================
+17. SCORE SPARSITY PATTERN
+============================================================
+
+17a. Gap (days) between consecutive scores (sample 100 regions):
+Unique gap values : [6.0, 7.0, 8.0]
+Gap distribution  :
+6.0      396
+7.0    77368
+8.0      336
+Mean gap          : 6.9992
+All gaps == 7     : False
+Saved: 13_score_gaps.png
+
+17b. Day of week of scored rows:
+day_of_week
+0    256359
+1    247354
+2    251566
+3    245861
+4    245331
+5    261153
+6    250312
+Unique day_of_week values with score: [np.int64(0), np.int64(1), np.int64(2), np.int64(3), np.int64(4), np.int64(5), np.int64(6)]
+-> Score falls on 7 different days of week
+Saved: 14_score_day_of_week.png
+
+17c. Check for weeks with missing score (sample 100 regions):
+Regions with missing score weeks: 100
+  region_id  total_weeks  weeks_with_score  missing
+0        R1          783               782        1
+1        R2          783               782        1
+2        R3          783               782        1
+3        R4          783               782        1
+4        R6          783               782        1
+5        R7          783               782        1
+6        R8          783               782        1
+7        R9          783               782        1
+8       R11          783               782        1
+9       R13          783               782        1
+
+17d. Number of scores per week (region R1):
+Scores per week distribution:
+score
+1    782
+0      1
+------------------------------------------------------------
+CONCLUSION: Score sparsity is structured and consistent — not random. Gap between scores is almost always exactly 7 days (99.1% of cases). Rare gap=6 or gap=8 (~0.9%) are calendar boundary effects at Dec 31/Jan 1 — not data errors. Score falls equally on all 7 days of week — day_of_week has no predictive signal and should be dropped. Each region has exactly 1 missing week (the first partial week on Dec 31). Dataset quality is high.
+------------------------------------------------------------
+
+============================================================
+18. TEST CONTINUITY + GAP WITH TRAIN
+============================================================
+
+18a. Check if 91 test days are consecutive (sample 20 regions):
+-> All 91 test days are CONSECUTIVE (JDN diff = 1 every day)
+
+18b. Gap (days) between train end and test start (sample 50 regions):
+Gap distribution:
+58     2
+72     1
+114    1
+136    1
+157    1
+170    1
+185    2
+198    1
+205    2
+213    1
+220    1
+226    1
+240    1
+241    2
+254    1
+255    2
+268    1
+304    1
+373    1
+470    1
+471    1
+492    3
+506    1
+527    1
+540    1
+548    1
+555    2
+561    3
+562    1
+568    2
+575    1
+576    1
+590    3
+597    2
+603    1
+604    1
+Mean gap : 383.68 days (~1.1 years)
+Min gap  : 58 days
+Max gap  : 604 days
+All gaps identical: False
+
+18c. Day_of_week at train end and test start:
+Train end   day_of_week:
+0     7
+1    10
+2    11
+3     6
+4     6
+5     7
+6     3
+Test  start day_of_week:
+0     8
+1     5
+2    10
+3     8
+4     9
+5     4
+6     6
+Saved: 15_test_continuity_gap.png
+------------------------------------------------------------
+CONCLUSION: 91 test days are perfectly consecutive for all regions. However, gap between train end and test start varies widely across regions: min=58 days, max=604 days, mean=384 days (~1.1 year). This is a critical modeling challenge: lag score features from train end will be stale by different amounts per region. Regions with large gaps (>500 days) are harder to predict using lag features alone. The 91-day test window provides recent meteorological context but no score labels.
+------------------------------------------------------------
+
+============================================================
+19. TRAIN vs TEST FEATURE DISTRIBUTION COMPARISON
+============================================================
+
+Train vs Test feature statistics:
+            train_mean  train_std  train_min  train_max  test_mean  test_std  test_min  test_max  mean_diff_pct
+prec          2.563559   6.215294       0.00     243.32   1.925298  4.628191      0.00     98.64          24.90
+surf_pre     95.936407   6.024206      66.12     104.32  95.942230  5.969428     67.87    103.78           0.01
+humidity      7.799983   4.728641       0.12      22.92   9.552843  4.378370      0.42     22.09          22.47
+tmp          12.949157  10.964134     -37.34      41.39  18.723120  8.463215    -25.91     39.67          44.59
+dp_tmp        6.781904  10.267199     -37.70      27.55  10.951538  8.637542    -28.51     26.71          61.48
+wb_tmp        6.817224  10.196349     -37.46      27.55  10.833376  8.535481    -25.95     26.62          58.91
+tmp_max      18.882389  11.563819     -32.20      50.03  25.148437  8.971018    -23.40     47.62          33.18
+tmp_min       7.537493  10.639241     -45.96      33.80  12.884061  8.294188    -34.82     32.30          70.93
+tmp_range    11.344899   4.053179       0.02      34.61  12.264379  3.805968      0.46     28.33           8.10
+surf_tmp     13.068181  11.235230     -37.19      43.85  18.967197  8.748682    -27.82     42.40          45.14
+wind          3.646797   1.879692       0.25      24.94   3.376459  1.756157      0.38     15.39           7.41
+wind_max      5.342148   2.656599       0.54      36.28   4.995270  2.530575      0.74     21.90           6.49
+wind_min      1.948686   1.371303       0.00      17.20   1.776932  1.273387      0.00     11.85           8.81
+wind_range    3.393461   1.987169       0.20      28.25   3.218356  1.907286      0.26     17.60           5.16
+
+Features with mean_diff_pct > 5%:
+            train_mean  test_mean  mean_diff_pct
+prec          2.563559   1.925298          24.90
+humidity      7.799983   9.552843          22.47
+tmp          12.949157  18.723120          44.59
+dp_tmp        6.781904  10.951538          61.48
+wb_tmp        6.817224  10.833376          58.91
+tmp_max      18.882389  25.148437          33.18
+tmp_min       7.537493  12.884061          70.93
+tmp_range    11.344899  12.264379           8.10
+surf_tmp     13.068181  18.967197          45.14
+wind          3.646797   3.376459           7.41
+wind_max      5.342148   4.995270           6.49
+wind_min      1.948686   1.776932           8.81
+wind_range    3.393461   3.218356           5.16
+Saved: 16_train_test_distribution.png
+
+Kolmogorov-Smirnov test (train vs test):
+Feature         KS stat      p-value   Same dist?
+--------------------------------------------------
+prec             0.0339       0.0000           NO
+surf_pre         0.0136       0.3134          YES
+humidity         0.1935       0.0000           NO
+tmp              0.2413       0.0000           NO
+dp_tmp           0.1937       0.0000           NO
+wb_tmp           0.1884       0.0000           NO
+tmp_max          0.2400       0.0000           NO
+tmp_min          0.2350       0.0000           NO
+tmp_range        0.1019       0.0000           NO
+surf_tmp         0.2390       0.0000           NO
+wind             0.0559       0.0000           NO
+wind_max         0.0555       0.0000           NO
+wind_min         0.0538       0.0000           NO
+wind_range       0.0412       0.0000           NO
+------------------------------------------------------------
+CONCLUSION: Most critical finding for modeling strategy. 13/14 features have significantly different distributions between train and test (KS test p~0). Temperature features differ most: tmp_min +70.9%, dp_tmp +61.5%, tmp +44.6%. Test data is consistently warmer and drier than train average. Most likely cause: test window falls in summer for most regions while train covers all 4 seasons over 15 years. This is a covariate shift problem. Mitigation: (1) train only on summer-like weeks, (2) weight training samples by similarity to test feature distribution, (3) include month as feature. Only surf_pre has similar distribution — it is season-independent.
+------------------------------------------------------------
