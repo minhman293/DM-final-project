@@ -5,7 +5,7 @@ class DisasterLSTM(nn.Module):
     def __init__(self, num_regions, num_features, embed_dim, hidden_size, num_layers, pred_len):
         super().__init__()
         
-        # Region Embedding: Let the network learn similarities between regions natively
+        # Region Embedding
         self.region_embed = nn.Embedding(num_regions, embed_dim)
         
         # LSTM for the weather sequence
@@ -17,28 +17,24 @@ class DisasterLSTM(nn.Module):
             dropout=0.2
         )
         
-        # Fully connected head to output the 5 weeks
+        # Fully connected head
+        # Input size: LSTM hidden_size + Embedding dim + 1 (for the region baseline scalar)
         self.fc = nn.Sequential(
-            nn.Linear(hidden_size + embed_dim, 64),
+            nn.Linear(hidden_size + embed_dim + 1, 64),
             nn.ReLU(),
             nn.Linear(64, pred_len)
         )
 
-    def forward(self, x_seq, region_idx):
-        # x_seq: (batch, seq_len, features)
-        # region_idx: (batch)
-        
+    def forward(self, x_seq, region_idx, baseline):
         # Get region embedding
-        embed = self.region_embed(region_idx)  # (batch, embed_dim)
+        embed = self.region_embed(region_idx) 
         
         # Pass sequence through LSTM
         lstm_out, (h_n, c_n) = self.lstm(x_seq)
+        final_h = h_n[-1] 
         
-        # Take the final hidden state from the top layer of the LSTM
-        final_h = h_n[-1]  # (batch, hidden_size)
-        
-        # Concatenate temporal context with region identity
-        combined = torch.cat([final_h, embed], dim=1)
+        # Concatenate temporal context, region identity, and the historical baseline anchor
+        combined = torch.cat([final_h, embed, baseline.unsqueeze(1)], dim=1)
         
         # Predict the next 5 weeks
         predictions = self.fc(combined)

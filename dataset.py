@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import numpy as np
-import pandas as pd
+
 from config_lstm import SEQ_LEN, PRED_LEN, FEATURES
 
 class DisasterSequenceDataset(Dataset):
@@ -10,6 +10,8 @@ class DisasterSequenceDataset(Dataset):
         self.X_seqs = []
         self.y_seqs = []
         self.region_idxs = []
+        self.baselines = []
+        self.summers = []
         
         # Group by region to extract sequences safely
         for region_id, group in weekly_df.groupby("region_id"):
@@ -18,26 +20,30 @@ class DisasterSequenceDataset(Dataset):
             
             # Scale features
             features_scaled = scaler.transform(group[FEATURES])
-            scores = group["score"].values if "score" in group.columns else None
+            baseline = group["region_mean_score"].iloc[0]
             
             n_weeks = len(group)
             
             if is_train:
+                scores = group["score"].values
+                months = group["month"].values
+                
                 # Sliding window to create massive training set
                 for i in range(n_weeks - SEQ_LEN - PRED_LEN + 1):
-                    # 13 weeks input
-                    seq_x = features_scaled[i : i + SEQ_LEN]
-                    # 5 weeks target
-                    seq_y = scores[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN]
-                    
-                    self.X_seqs.append(seq_x)
-                    self.y_seqs.append(seq_y)
+                    self.X_seqs.append(features_scaled[i : i + SEQ_LEN])
+                    self.y_seqs.append(scores[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN])
                     self.region_idxs.append(r_idx)
+                    self.baselines.append(baseline)
+                    
+                    # EDA Insight: Check if the prediction window starts in Summer (Months 5-10)
+                    target_month = months[i + SEQ_LEN]
+                    is_summer = 1.0 if target_month in [5, 6, 7, 8, 9, 10] else 0.0
+                    self.summers.append(is_summer)
             else:
                 # For test set, we only have exactly 13 weeks per region
-                seq_x = features_scaled[-SEQ_LEN:]
-                self.X_seqs.append(seq_x)
+                self.X_seqs.append(features_scaled[-SEQ_LEN:])
                 self.region_idxs.append(r_idx)
+                self.baselines.append(baseline)
 
     def __len__(self):
         return len(self.X_seqs)
@@ -45,8 +51,11 @@ class DisasterSequenceDataset(Dataset):
     def __getitem__(self, idx):
         x = torch.tensor(self.X_seqs[idx], dtype=torch.float32)
         r = torch.tensor(self.region_idxs[idx], dtype=torch.long)
+        b = torch.tensor(self.baselines[idx], dtype=torch.float32)
         
         if self.is_train:
             y = torch.tensor(self.y_seqs[idx], dtype=torch.float32)
-            return x, r, y
-        return x, r
+            s = torch.tensor(self.summers[idx], dtype=torch.float32)
+            return x, r, b, y, s
+            
+        return x, r, b
