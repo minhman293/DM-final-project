@@ -233,6 +233,24 @@ def apply_seasonal_filter(
     logger.info(f"Summer weeks: {summer_count:,} | Winter weeks: {len(weekly)-summer_count:,}")
     return weekly
 
+def add_phase2_features(weekly: pd.DataFrame) -> pd.DataFrame:
+    """Add cyclical time encodings and week-over-week deltas (Phase 2 fixed)."""
+    weekly = weekly.copy()
+
+    # 1. Cyclical Month Encoding (Safe)
+    weekly["month_sin"] = np.sin(2 * np.pi * weekly["month"] / 12.0).astype(np.float32)
+    weekly["month_cos"] = np.cos(2 * np.pi * weekly["month"] / 12.0).astype(np.float32)
+
+    # 2. Week-over-Week Deltas (Immune to Train/Test Shift)
+    # How much did the weather change compared to last week?
+    weekly = weekly.sort_values(["region_id", "week_id"])
+    
+    if "prec_sum" in weekly.columns:
+        weekly["delta_prec"] = weekly.groupby("region_id")["prec_sum"].diff().fillna(0).astype(np.float32)
+    if "tmp_range_mean" in weekly.columns:
+        weekly["delta_tmp_range"] = weekly.groupby("region_id")["tmp_range_mean"].diff().fillna(0).astype(np.float32)
+
+    return weekly
 
 # ── Master pipeline ───────────────────────────────────────────────────────────
 def build_features(
@@ -266,6 +284,8 @@ def build_features(
     # Region baseline
     region_baseline = compute_region_baseline(train_raw)
     train_weekly    = add_region_baseline(train_weekly, region_baseline)
+
+    train_weekly = add_phase2_features(train_weekly, train_raw)
 
     # Seasonal weighting 
     train_weekly = apply_seasonal_filter(train_weekly)
