@@ -123,4 +123,4 @@ DEVICES = 1
 PRECISION = "16-mixed"  # "32-true", "16-mixed", or "bf16-mixed" (if supported)
 PATCH_ATTENTION_FOR_FP16 = True    # set True if you switch PRECISION to "16-mixed"
 
-SEED = 42
+SEED = 999
