@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 def ensemble_submissions():
     # ver 1: simple 50/50 blend of the best LSTM and best TFT
@@ -57,7 +58,7 @@ def ensemble_submissions():
     #     super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
         
     # # =========================================================
-    # # STRATEGY A: Static Asymmetric (70% TFT / 30% LSTM)
+    # # STRATEGY A: Static Asymmetric (70% TFT / 30% LSTM) THIS IS THE BEST ONE SO FAR
     # # =========================================================
     # sub_70_30 = lstm.copy()
     # for col in pred_cols:
@@ -90,49 +91,133 @@ def ensemble_submissions():
     # print("Smart ensembles generated successfully!")
 
     # ver 4
-    # 1. Load the models
+    # # 1. Load the models
+    # lstm = pd.read_csv("submissions/submission_lstm_v2.csv")
+    # tft_42 = pd.read_csv("submissions/submission_tft_v4_relu.csv")
+    # tft_123 = pd.read_csv("submissions/submission_tft_v4_relu_123.csv")
+    # tft_999 = pd.read_csv("submissions/submission_tft_v4_relu_999.csv")
+
+    # pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
+
+    # # 2. Build the Super TFT
+    # super_tft = lstm.copy()
+    # for col in pred_cols:
+    #     super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
+
+    # # =========================================================
+    # # STRATEGY 1: 80% TFT / 20% LSTM
+    # # =========================================================
+    # sub_80_20 = lstm.copy()
+    # for col in pred_cols:
+    #     sub_80_20[col] = (super_tft[col] * 0.80) + (lstm[col] * 0.20)
+    #     sub_80_20[col] = sub_80_20[col].round(4)
+    # sub_80_20.to_csv("submissions/ensemble_80tft_20lstm.csv", index=False)
+
+    # # =========================================================
+    # # STRATEGY 2: 85% TFT / 15% LSTM
+    # # =========================================================
+    # sub_85_15 = lstm.copy()
+    # for col in pred_cols:
+    #     sub_85_15[col] = (super_tft[col] * 0.85) + (lstm[col] * 0.15)
+    #     sub_85_15[col] = sub_85_15[col].round(4)
+    # sub_85_15.to_csv("submissions/ensemble_85tft_15lstm.csv", index=False)
+
+    # # =========================================================
+    # # STRATEGY 3: The Micro-Squeezer (Applied to 80/20)
+    # # =========================================================
+    # # Snaps tiny mathematical noise to absolute zero
+    # sub_80_20_squeezed = sub_80_20.copy()
+    # for col in pred_cols:
+    #     sub_80_20_squeezed[col] = sub_80_20_squeezed[col].where(
+    #         sub_80_20_squeezed[col] >= 0.10, 0.0
+    #     )
+    # sub_80_20_squeezed.to_csv("submissions/ensemble_80tft_20lstm_squeezed.csv", index=False)
+
+    # print("Extrapolation and Micro-Squeezer files generated successfully!")
+    
+    # ver 5
+    # print("1. Loading the Champion Models...")
+    # # Load your best LSTM
+    # lstm = pd.read_csv("submissions/submission_lstm_v2.csv")
+    
+    # # Load the 3 Median TFT models
+    # tft_42 = pd.read_csv("submissions/submission_tft_v4_relu.csv")
+    # tft_123 = pd.read_csv("submissions/submission_tft_v4_relu_123.csv")
+    # tft_999 = pd.read_csv("submissions/submission_tft_v4_relu_999.csv")
+
+    # pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
+
+    # print("2. Building the Super TFT...")
+    # super_tft = lstm.copy()
+    # for col in pred_cols:
+    #     super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
+
+    # print("3. Applying the LSTM-Gated Squeezer...")
+    # final_sub = lstm.copy()
+    
+    # for col in pred_cols:
+    #     # Calculate the standard 70/30 blend
+    #     standard_blend = (super_tft[col] * 0.70) + (lstm[col] * 0.30)
+        
+    #     # Apply the Gate: If LSTM is highly confident it's a zero (<0.10), force to 0.0
+    #     # Otherwise, keep the 70/30 blend
+    #     final_sub[col] = np.where(lstm[col] < 0.10, 0.0, standard_blend)
+        
+    #     # Round to 4 decimals for Kaggle
+    #     final_sub[col] = final_sub[col].round(4)
+
+    # out_path = "submissions/ensemble_70tft_30lstm_GATED.csv"
+    # final_sub.to_csv(out_path, index=False)
+    # print(f"Success! Saved to {out_path}")
+
+    # ver 6
+    print("1. Loading the Champion Models...")
+    # Load your best LSTM
     lstm = pd.read_csv("submissions/submission_lstm_v2.csv")
+    
+    # Load the 3 Median TFT models
     tft_42 = pd.read_csv("submissions/submission_tft_v4_relu.csv")
     tft_123 = pd.read_csv("submissions/submission_tft_v4_relu_123.csv")
     tft_999 = pd.read_csv("submissions/submission_tft_v4_relu_999.csv")
 
-    pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
+    print("2. Calculating true historical baseline per region...")
+    train = pd.read_csv("data/train.csv")
+    region_means = train.dropna(subset=["score"]).groupby("region_id")["score"].mean().to_dict()
+    global_mean = train["score"].mean()
 
-    # 2. Build the Super TFT
+    print("3. Building the Super TFT...")
+    pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
     super_tft = lstm.copy()
     for col in pred_cols:
         super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
 
-    # =========================================================
-    # STRATEGY 1: 80% TFT / 20% LSTM
-    # =========================================================
-    sub_80_20 = lstm.copy()
-    for col in pred_cols:
-        sub_80_20[col] = (super_tft[col] * 0.80) + (lstm[col] * 0.20)
-        sub_80_20[col] = sub_80_20[col].round(4)
-    sub_80_20.to_csv("submissions/ensemble_80tft_20lstm.csv", index=False)
+    print("4. Applying the 55/25/20 Triple Blend...")
+    final_sub = lstm.copy()
+    
+    for idx, row in final_sub.iterrows():
+        reg = row["region_id"]
+        # Handle string or int region_ids safely
+        try:
+            reg_key = int(reg)
+        except ValueError:
+            reg_key = reg
+            
+        baseline = region_means.get(reg_key, global_mean)
 
-    # =========================================================
-    # STRATEGY 2: 85% TFT / 15% LSTM
-    # =========================================================
-    sub_85_15 = lstm.copy()
-    for col in pred_cols:
-        sub_85_15[col] = (super_tft[col] * 0.85) + (lstm[col] * 0.15)
-        sub_85_15[col] = sub_85_15[col].round(4)
-    sub_85_15.to_csv("submissions/ensemble_85tft_15lstm.csv", index=False)
+        for col in pred_cols:
+            tft_val = super_tft.at[idx, col]
+            lstm_val = lstm.at[idx, col]
+            
+            # The Formula: 55% TFT + 25% LSTM + 20% Region Mean
+            blended_val = (tft_val * 0.55) + (lstm_val * 0.25) + (baseline * 0.20)
+            final_sub.at[idx, col] = blended_val
 
-    # =========================================================
-    # STRATEGY 3: The Micro-Squeezer (Applied to 80/20)
-    # =========================================================
-    # Snaps tiny mathematical noise to absolute zero
-    sub_80_20_squeezed = sub_80_20.copy()
     for col in pred_cols:
-        sub_80_20_squeezed[col] = sub_80_20_squeezed[col].where(
-            sub_80_20_squeezed[col] >= 0.10, 0.0
-        )
-    sub_80_20_squeezed.to_csv("submissions/ensemble_80tft_20lstm_squeezed.csv", index=False)
+        final_sub[col] = final_sub[col].round(4)
 
-    print("Extrapolation and Micro-Squeezer files generated successfully!")
+    out_path = "submissions/ensemble_TRIPLE_BLEND.csv"
+    final_sub.to_csv(out_path, index=False)
+    print(f"Success! Saved to {out_path}")
 
 if __name__ == "__main__":
     ensemble_submissions()

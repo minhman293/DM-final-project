@@ -3,7 +3,7 @@
 from pathlib import Path
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-DATA_DIR        = Path("data")
+DATA_DIR        = Path("data_local")
 TRAIN_PATH      = DATA_DIR / "train.csv"
 TEST_PATH       = DATA_DIR / "test.csv"
 SAMPLE_SUB_PATH = "sample_submission.csv"
