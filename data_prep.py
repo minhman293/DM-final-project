@@ -142,7 +142,7 @@ def build_combined_frame(
     weekly_test = _aggregate_daily_to_weekly(test_raw, is_train=False)
 
     # ---> PROPER DATA TRUNCATION <---
-    log.info("Applying 50% Truncation: Keeping last 391 weeks of train data...")
+    # log.info("Applying 50% Truncation: Keeping last 391 weeks of train data...")
     weekly_train = weekly_train.groupby(REGION_COL).tail(391).reset_index(drop=True)
 
     weekly_train = _fill_missing_weekly_scores(weekly_train)

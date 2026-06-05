@@ -3,3 +3,6 @@ data/test.csv
 sample_submission.csv
 artifacts_tft/
 lightning_logs/
+data_local/test.csv
+data_local/train.csv
+data_local/local_truth.csv

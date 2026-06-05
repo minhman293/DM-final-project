@@ -12,7 +12,7 @@ Edit DATA_DIR if your layout differs.
 from pathlib import Path
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-DATA_DIR = Path("data")
+DATA_DIR = Path("data")  # set to "data" for real Kaggle environment, "data_local" for local validation
 TRAIN_PATH = DATA_DIR / "train.csv"
 TEST_PATH = DATA_DIR / "test.csv"
 SAMPLE_SUB_PATH = Path("sample_submission.csv")
@@ -123,4 +123,4 @@ DEVICES = 1
 PRECISION = "16-mixed"  # "32-true", "16-mixed", or "bf16-mixed" (if supported)
 PATCH_ATTENTION_FOR_FP16 = True    # set True if you switch PRECISION to "16-mixed"
 
-SEED = 999
+SEED = 42
