@@ -45,27 +45,27 @@ def ensemble_submissions():
 
     # ver 3: more aggressive 70% TFT / 30% LSTM blend, plus a time-decay variant that gives LSTM more weight on Week 1 and less on Week 5.
     # 1. Load the models
-    lstm = pd.read_csv("submissions/submission_lstm_v2.csv")
-    tft_42 = pd.read_csv("submissions/submission_tft_v4_relu.csv")
-    tft_123 = pd.read_csv("submissions/submission_tft_v4_relu_123.csv")
-    tft_999 = pd.read_csv("submissions/submission_tft_v4_relu_999.csv")
+    # lstm = pd.read_csv("submissions/submission_lstm_v2.csv")
+    # tft_42 = pd.read_csv("submissions/submission_tft_v4_relu.csv")
+    # tft_123 = pd.read_csv("submissions/submission_tft_v4_relu_123.csv")
+    # tft_999 = pd.read_csv("submissions/submission_tft_v4_relu_999.csv")
     
-    pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
+    # pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
     
-    # 2. Build the Super TFT
-    super_tft = lstm.copy()
-    for col in pred_cols:
-        super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
+    # # 2. Build the Super TFT
+    # super_tft = lstm.copy()
+    # for col in pred_cols:
+    #     super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
         
-    # =========================================================
-    # STRATEGY A: Static Asymmetric (70% TFT / 30% LSTM) THIS IS THE BEST ONE SO FAR
-    # =========================================================
-    sub_70_30 = lstm.copy()
-    for col in pred_cols:
-        sub_70_30[col] = (super_tft[col] * 0.70) + (lstm[col] * 0.30)
-        sub_70_30[col] = sub_70_30[col].round(4)
+    # # =========================================================
+    # # STRATEGY A: Static Asymmetric (70% TFT / 30% LSTM) THIS IS THE BEST ONE SO FAR
+    # # =========================================================
+    # sub_70_30 = lstm.copy()
+    # for col in pred_cols:
+    #     sub_70_30[col] = (super_tft[col] * 0.70) + (lstm[col] * 0.30)
+    #     sub_70_30[col] = sub_70_30[col].round(4)
         
-    sub_70_30.to_csv("submissions/ensemble_70tft_30lstm.csv", index=False)
+    # sub_70_30.to_csv("submissions/ensemble_70tft_30lstm.csv", index=False)
     
     # # =========================================================
     # # STRATEGY B: Time-Decay Blending (The 0.80 Breaker)
@@ -174,6 +174,24 @@ def ensemble_submissions():
     # out_path = "submissions/ensemble_TRIPLE_BLEND.csv"
     # final_sub.to_csv(out_path, index=False)
     # print(f"Success! Saved to {out_path}")
+
+    # Load your two best distinct models
+    lstm_sub = pd.read_csv("submissions/submission_lstm_upgrade.csv")
+    tft_sub = pd.read_csv("submissions/submission_tft_upgrade.csv")
+    
+    # Create a copy for the ensemble
+    ensemble = lstm_sub.copy()
+    
+    pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
+    
+    # 30/70 Blend
+    for col in pred_cols:
+        ensemble[col] = (lstm_sub[col] * 0.30) + (tft_sub[col] * 0.70)
+        ensemble[col] = ensemble[col].round(4)
+        
+    ensemble.to_csv("submissions/ensemble_70tft_30lstm_upgrade.csv", index=False)
+    print("Ensemble saved!")
+
 
 if __name__ == "__main__":
     ensemble_submissions()

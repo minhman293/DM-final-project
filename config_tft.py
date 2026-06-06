@@ -40,7 +40,6 @@ METEO_COLS_DAILY = [
 ]
 
 # Weekly-aggregated features fed into TFT as time-varying observed inputs.
-# Removed absolute temperatures (tmp_mean, tmp_min) to prevent the Exploding Scaler trap.
 WEEKLY_FEATURES = [
     # Stable EDA Features
     "surf_pre_mean", 
@@ -52,9 +51,19 @@ WEEKLY_FEATURES = [
     "prec_sum", 
     "humidity_mean",
     
-    # Shift-Immune Dynamics
+    # --- NEW: Volatility & Exponential Smoothing ---
+    "prec_ema_4w",
+    "tmp_range_ema_4w",
+    "prec_std_4w",
+    "tmp_range_std_4w",
+    
+    # Shift-Immune Dynamics (1st, 2nd, and Seasonal)
     "delta_prec",
-    "delta_tmp_range"
+    "delta2_prec",
+    "seasonal_diff_prec",
+    "delta_tmp_range",
+    "delta2_tmp_range",
+    "seasonal_diff_tmp_range"
 ]
 
 # Aggregation spec: out_col -> (src_col, agg_func)

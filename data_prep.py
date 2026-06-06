@@ -47,25 +47,15 @@ log = get_logger("data_prep")
 def _aggregate_daily_to_weekly(daily: pd.DataFrame, is_train: bool) -> pd.DataFrame:
     """
     Aggregate 7-day chunks per region into one weekly row.
-
-    Week boundaries: consecutive 7-row blocks starting from each region's
-    first row (already sorted by jdn). Score is taken as the first non-null
-    value within the week.
-
-    Returns columns: region_id, week_id, score (train only), month, plus
-    every entry in WEEKLY_FEATURES.
     """
     daily = daily.sort_values([REGION_COL, "jdn"]).reset_index(drop=True)
     daily["week_id"] = daily.groupby(REGION_COL).cumcount() // 7
 
-    # Single groupby call with all aggregations — much faster than multiple passes
     agg_dict = {}
     for out_col, (src_col, func) in WEEKLY_AGG_SPEC.items():
         agg_dict[out_col] = (src_col, func)
-    agg_dict["month"] = ("month", "last")        # month of the last day of the week
+    agg_dict["month"] = ("month", "last") 
     if is_train:
-        # score is recorded on one day per week; the rest are NaN.
-        # Using min() ignores NaN and picks the (single) numeric value.
         agg_dict["score"] = (TARGET_COL, "min")
 
     weekly = (
@@ -74,18 +64,44 @@ def _aggregate_daily_to_weekly(daily: pd.DataFrame, is_train: bool) -> pd.DataFr
         .reset_index()
     )
 
-    # Cast features to float32; integer codes stay small
     for c in WEEKLY_FEATURES:
-        if c in weekly.columns and not c.startswith("delta_"):
+        if c in weekly.columns and not c.startswith("delta_") and not "ema" in c and not "std" in c and not "seasonal" in c:
             weekly[c] = weekly[c].astype(np.float32)
     weekly["month"] = weekly["month"].astype(np.int8)
 
-    # ---> ADD DELTAS HERE <---
+    # ---> ADD ADVANCED DELTAS, VOLATILITY, AND EMA HERE <---
     weekly = weekly.sort_values([REGION_COL, "week_id"])
+    
+    # 1. Exponential Moving Average (EMA) - 4 week span
+    if "prec_sum" in weekly.columns:
+        weekly["prec_ema_4w"] = weekly.groupby(REGION_COL)["prec_sum"].transform(
+            lambda x: x.ewm(span=4, adjust=False).mean()
+        ).astype(np.float32)
+    if "tmp_range_mean" in weekly.columns:
+        weekly["tmp_range_ema_4w"] = weekly.groupby(REGION_COL)["tmp_range_mean"].transform(
+            lambda x: x.ewm(span=4, adjust=False).mean()
+        ).astype(np.float32)
+
+    # 2. Rolling Volatility (Standard Deviation) - 4 week window
+    if "prec_sum" in weekly.columns:
+        weekly["prec_std_4w"] = weekly.groupby(REGION_COL)["prec_sum"].transform(
+            lambda x: x.rolling(4, min_periods=1).std().fillna(0)
+        ).astype(np.float32)
+    if "tmp_range_mean" in weekly.columns:
+        weekly["tmp_range_std_4w"] = weekly.groupby(REGION_COL)["tmp_range_mean"].transform(
+            lambda x: x.rolling(4, min_periods=1).std().fillna(0)
+        ).astype(np.float32)
+
+    # 3. Differencing (1st, 2nd, and 52-week Seasonal)
     if "prec_sum" in weekly.columns:
         weekly["delta_prec"] = weekly.groupby(REGION_COL)["prec_sum"].diff().fillna(0).astype(np.float32)
+        weekly["delta2_prec"] = weekly.groupby(REGION_COL)["delta_prec"].diff().fillna(0).astype(np.float32)
+        weekly["seasonal_diff_prec"] = weekly.groupby(REGION_COL)["prec_sum"].diff(52).fillna(0).astype(np.float32)
+
     if "tmp_range_mean" in weekly.columns:
         weekly["delta_tmp_range"] = weekly.groupby(REGION_COL)["tmp_range_mean"].diff().fillna(0).astype(np.float32)
+        weekly["delta2_tmp_range"] = weekly.groupby(REGION_COL)["delta_tmp_range"].diff().fillna(0).astype(np.float32)
+        weekly["seasonal_diff_tmp_range"] = weekly.groupby(REGION_COL)["tmp_range_mean"].diff(52).fillna(0).astype(np.float32)
 
     log.info(
         "Aggregated %s to weekly: %d rows, %d regions",

@@ -58,7 +58,7 @@ def main():
         raise FileNotFoundError(
             f"No checkpoint matching tft_best*.ckpt found in {ARTIFACT_DIR}"
         )
-    ckpt = ARTIFACT_DIR / "tft_best-v5.ckpt"
+    ckpt = ARTIFACT_DIR / "tft_best.ckpt"
     log.info("Loading model weights from %s", ckpt)
     tft = TemporalFusionTransformer.load_from_checkpoint(str(ckpt))
     tft.eval()
@@ -151,7 +151,7 @@ def main():
 
     submission[pred_cols] = submission[pred_cols].round(4)
 
-    out_path = SUBMISSION_DIR / "submission_tft_42_full_data.csv"
+    out_path = SUBMISSION_DIR / "submission_tft_upgrade.csv"
     submission.to_csv(out_path, index=False)
     log.info("Saved → %s", out_path)
     log.info("Submission summary:")

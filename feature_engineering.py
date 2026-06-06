@@ -233,24 +233,49 @@ def apply_seasonal_filter(
     logger.info(f"Summer weeks: {summer_count:,} | Winter weeks: {len(weekly)-summer_count:,}")
     return weekly
 
-def add_phase2_features(weekly: pd.DataFrame) -> pd.DataFrame:
-    """Add cyclical time encodings and week-over-week deltas (Phase 2 fixed)."""
-    weekly = weekly.copy()
-
-    # 1. Cyclical Month Encoding (Safe)
-    weekly["month_sin"] = np.sin(2 * np.pi * weekly["month"] / 12.0).astype(np.float32)
-    weekly["month_cos"] = np.cos(2 * np.pi * weekly["month"] / 12.0).astype(np.float32)
-
-    # 2. Week-over-Week Deltas (Immune to Train/Test Shift)
-    # How much did the weather change compared to last week?
-    weekly = weekly.sort_values(["region_id", "week_id"])
+def add_phase2_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    # Ensure it is sorted chronologically per region before doing rolling math
+    df = df.sort_values(["region_id", "week_id"])
     
-    if "prec_sum" in weekly.columns:
-        weekly["delta_prec"] = weekly.groupby("region_id")["prec_sum"].diff().fillna(0).astype(np.float32)
-    if "tmp_range_mean" in weekly.columns:
-        weekly["delta_tmp_range"] = weekly.groupby("region_id")["tmp_range_mean"].diff().fillna(0).astype(np.float32)
+    # --- EXISTING FEATURES (Keep whatever was already here like month_sin/cos) ---
+    if "month" in df.columns:
+        radians = (df["month"].astype(np.float32) - 1.0) * (2.0 * np.pi / 12.0)
+        df["month_sin"] = np.sin(radians).astype(np.float32)
+        df["month_cos"] = np.cos(radians).astype(np.float32)
 
-    return weekly
+    # --- NEW: Exponential Moving Average (EMA) - 4 week span ---
+    if "prec_sum" in df.columns:
+        df["prec_ema_4w"] = df.groupby("region_id")["prec_sum"].transform(
+            lambda x: x.ewm(span=4, adjust=False).mean()
+        ).astype(np.float32)
+    if "tmp_range_mean" in df.columns:
+        df["tmp_range_ema_4w"] = df.groupby("region_id")["tmp_range_mean"].transform(
+            lambda x: x.ewm(span=4, adjust=False).mean()
+        ).astype(np.float32)
+
+    # --- NEW: Rolling Volatility (Standard Deviation) - 4 week window ---
+    if "prec_sum" in df.columns:
+        df["prec_std_4w"] = df.groupby("region_id")["prec_sum"].transform(
+            lambda x: x.rolling(4, min_periods=1).std().fillna(0)
+        ).astype(np.float32)
+    if "tmp_range_mean" in df.columns:
+        df["tmp_range_std_4w"] = df.groupby("region_id")["tmp_range_mean"].transform(
+            lambda x: x.rolling(4, min_periods=1).std().fillna(0)
+        ).astype(np.float32)
+
+    # --- NEW: Differencing (1st, 2nd, and 52-week Seasonal) ---
+    if "prec_sum" in df.columns:
+        df["delta_prec"] = df.groupby("region_id")["prec_sum"].diff().fillna(0).astype(np.float32)
+        df["delta2_prec"] = df.groupby("region_id")["delta_prec"].diff().fillna(0).astype(np.float32)
+        df["seasonal_diff_prec"] = df.groupby("region_id")["prec_sum"].diff(52).fillna(0).astype(np.float32)
+
+    if "tmp_range_mean" in df.columns:
+        df["delta_tmp_range"] = df.groupby("region_id")["tmp_range_mean"].diff().fillna(0).astype(np.float32)
+        df["delta2_tmp_range"] = df.groupby("region_id")["delta_tmp_range"].diff().fillna(0).astype(np.float32)
+        df["seasonal_diff_tmp_range"] = df.groupby("region_id")["tmp_range_mean"].diff(52).fillna(0).astype(np.float32)
+
+    return df
 
 # ── Master pipeline ───────────────────────────────────────────────────────────
 def build_features(

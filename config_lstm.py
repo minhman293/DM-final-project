@@ -3,7 +3,7 @@
 from pathlib import Path
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-DATA_DIR        = Path("data_local")
+DATA_DIR        = Path("data")
 TRAIN_PATH      = DATA_DIR / "train.csv"
 TEST_PATH       = DATA_DIR / "test.csv"
 SAMPLE_SUB_PATH = "sample_submission.csv"
@@ -43,13 +43,22 @@ FEATURES = [
     "prec_sum", 
     "humidity_mean",
     
-    # Shift-Immune Dynamics (The new features)
+    # --- NEW: Volatility & Exponential Smoothing ---
+    "prec_ema_4w",
+    "tmp_range_ema_4w",
+    "prec_std_4w",
+    "tmp_range_std_4w",
+    
+    # Shift-Immune Dynamics (1st, 2nd, and Seasonal)
     "delta_prec",
+    "delta2_prec",
+    "seasonal_diff_prec",
     "delta_tmp_range",
+    "delta2_tmp_range",
+    "seasonal_diff_tmp_range",
     "month_sin", 
     "month_cos"
 ]
-# NOTE: Removed "tmp_mean", "tmp_max_max", "surf_tmp_mean", "tmp_range_mean"
 
 # ── Loss weighting ────────────────────────────────────────────────────────────
 SUMMER_WEIGHT_MULTIPLIER = 3.0   # 3x loss weight for summer prediction targets
