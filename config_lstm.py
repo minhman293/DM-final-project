@@ -1,4 +1,4 @@
-# config_lstm.py — Configuration for LSTM training and inference
+# config_lstm.py — Configuration for LSTM Version 2 (The 0.9029 Anchor)
 
 from pathlib import Path
 
@@ -14,48 +14,38 @@ SUBMISSION_DIR = Path("submissions")
 SUBMISSION_DIR.mkdir(exist_ok=True)
 
 # ── Sequence configuration ────────────────────────────────────────────────────
-SEQ_LEN  = 13   # 13 weeks of input weather context (matches test window)
+SEQ_LEN  = 13   # 13 weeks of input weather context
 PRED_LEN = 5    # 5 weeks of output score prediction
 
 # ── LSTM Hyperparameters ──────────────────────────────────────────────────────
 BATCH_SIZE    = 512
-EPOCHS        = 50           # increased from 30 — early stopping will cut it short
+EPOCHS        = 50           
 LEARNING_RATE = 1e-3
 HIDDEN_SIZE   = 128
 NUM_LAYERS    = 2
 EMBED_DIM     = 16           # region embedding dimension
 
 # ── Validation settings ───────────────────────────────────────────────────────
-VAL_REGION_COUNT       = 200   # number of regions held out for validation
-EARLY_STOPPING_PATIENCE = 5    # stop if val MAE doesn't improve for N epochs
+VAL_REGION_COUNT       = 200   
+EARLY_STOPPING_PATIENCE = 5    
 SEED                   = 42
 
-# ── Meteorological features used by the model ────────────────────────────────
+# ── Meteorological features (V2 STRICT) ───────────────────────────────────────
 FEATURES = [
-    # The ultra-stable EDA features (Shift < 10%)
+    # The ultra-stable EDA features
     "surf_pre_mean", 
     "tmp_range_mean", 
     "wind_mean", 
     "wind_max_max",
     "wind_range_mean",
     
-    # Mildly shifted but necessary
+    # Mildly shifted
     "prec_sum", 
     "humidity_mean",
     
-    # --- NEW: Volatility & Exponential Smoothing ---
-    "prec_ema_4w",
-    "tmp_range_ema_4w",
-    "prec_std_4w",
-    "tmp_range_std_4w",
-    
-    # Shift-Immune Dynamics (1st, 2nd, and Seasonal)
+    # Simple Shift-Immune Dynamics (NO EMA, NO 2nd-Order)
     "delta_prec",
-    "delta2_prec",
-    "seasonal_diff_prec",
     "delta_tmp_range",
-    "delta2_tmp_range",
-    "seasonal_diff_tmp_range",
     "month_sin", 
     "month_cos"
 ]

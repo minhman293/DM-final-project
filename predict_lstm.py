@@ -110,7 +110,7 @@ def main():
 
     submission[pred_cols] = submission[pred_cols].round(4)
 
-    out_path = SUBMISSION_DIR / "submission_lstm_upgrade.csv"
+    out_path = SUBMISSION_DIR / "submission_lstm_best.csv"
     submission.to_csv(out_path, index=False)
 
     # Diagnostic prediction stats
