@@ -2,19 +2,32 @@
 # Install in a fresh venv:
 #   pip install -r requirements.txt
 #
-# pytorch-forecasting pulls compatible pytorch-lightning; we pin the trio
-# to known-good versions to avoid the recurring API breakages in this ecosystem.
-
+# Core ML / DL stack (pinned to ranges known-good for this project)
 torch>=2.1,<2.5
 lightning>=2.1,<2.5
 pytorch-lightning>=2.1,<2.5
 pytorch-forecasting>=1.0.0,<1.3
-pandas>=2.0
+
+# Data science
+pandas>=2.0,<3.0
 numpy>=1.24,<2.0
+scipy>=1.10
 scikit-learn>=1.3
 joblib>=1.3
+
+# Modeling / boosting
+lightgbm>=3.4
+
+# Visualization & utilities
+matplotlib>=3.7
+seaborn>=0.12
 tqdm>=4.66
 
 # Optional but recommended — speeds up the cached weekly frame.
 # If not installed, the pipeline silently falls back to pickle.
 pyarrow>=14.0
+
+# Notes:
+# - This file lists the third-party packages imported across the project files.
+# - For an exact freeze with precise versions, run `pip freeze > requirements_exact.txt`
+#   in your activated environment and commit that output.

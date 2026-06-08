@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 from pathlib import Path
-from config_pipeline_b import ARTIFACT_DIR, MODEL_DIR
+from config_pipeline_b import ARTIFACT_DIR, MODEL_DIR, HISTORY
 
 def build_3d_numpy_dataset():
     print("1. Loading TFT's pre-processed Combined Frame...")
@@ -24,7 +24,6 @@ def build_3d_numpy_dataset():
     ]
     
     print("2. Splitting into Train and Test...")
-    # is_test == 0 (Train), is_test == 1 (Test), is_test == 2 (Future/NaNs)
     train_w = combined[combined["is_test"] == 0].sort_values(['region_id', 'time_idx'])
     test_w = combined[combined["is_test"] == 1].sort_values(['region_id', 'time_idx'])
     
@@ -36,7 +35,9 @@ def build_3d_numpy_dataset():
     # 4. Create 3D Numpy Arrays [Regions, Weeks, Features]
     num_regions = len(regions)
     num_train_weeks = train_w.groupby('region_id').size().max() # Should be 391
-    num_test_weeks = test_w.groupby('region_id').size().max()   # Should be 13
+    
+    # FIX: Force the test sequences to be exactly HISTORY (26) weeks long
+    num_test_weeks = HISTORY 
     num_features = len(features)
     
     train_array = np.zeros((num_regions, num_train_weeks, num_features), dtype=np.float32)
@@ -50,7 +51,13 @@ def build_3d_numpy_dataset():
         
         train_array[idx, :len(r_train), :] = r_train[features].values
         target_array[idx, :len(r_train)] = r_train['score'].values
-        test_array[idx, :len(r_test), :] = r_test[features].values
+        
+        # FIX: Splicing! Grab the last (26 - 13) weeks of train data and prepend it to the test data.
+        num_train_needed = HISTORY - len(r_test)
+        r_train_tail = r_train.tail(num_train_needed)
+        
+        test_seq = pd.concat([r_train_tail, r_test])[features].values
+        test_array[idx, :, :] = test_seq
 
     print("5. Normalizing Features...")
     mean = np.nanmean(train_array, axis=(0, 1))
@@ -63,7 +70,7 @@ def build_3d_numpy_dataset():
     np.save(MODEL_DIR / "train_targets.npy", target_array)
     np.save(MODEL_DIR / "test_features.npy", test_array)
     
-    print(f"Done! Train Array Shape: {train_array.shape} (Regions, Weeks, Features)")
+    print(f"Done! Train Array: {train_array.shape} | Test Array: {test_array.shape}")
 
 if __name__ == "__main__":
     build_3d_numpy_dataset()
