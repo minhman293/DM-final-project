@@ -264,29 +264,101 @@ def main():
     pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
     
     # Build Super-TFT
-    super_tft = tft_42.copy()
-    for col in pred_cols:
-        super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
+    # super_tft = tft_42.copy()
+    # for col in pred_cols:
+    #     super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
         
-    # The Mathematical Sweet Spot: 64% TFT and 36% LSTM
-    tft_weight = 0.64
-    lstm_weight = 0.36
+    # # The Mathematical Sweet Spot: 64% TFT and 36% LSTM
+    # tft_weight = 0.64
+    # lstm_weight = 0.36
     
-    final_blend = super_tft.copy()
-    for col in pred_cols:
-        final_blend[col] = (super_tft[col] * tft_weight) + (lstm[col] * lstm_weight)
+    # final_blend = super_tft.copy()
+    # for col in pred_cols:
+    #     final_blend[col] = (super_tft[col] * tft_weight) + (lstm[col] * lstm_weight)
         
-        # # Post-processing squeeze
-        # final_blend[col] = np.where(final_blend[col] < 0.05, 0.0, final_blend[col])
-        # final_blend[col] = np.clip(final_blend[col], 0.0, 5.0).round(4)
+    #     # # Post-processing squeeze
+    #     # final_blend[col] = np.where(final_blend[col] < 0.05, 0.0, final_blend[col])
+    #     # final_blend[col] = np.clip(final_blend[col], 0.0, 5.0).round(4)
 
-        # Shift down by 0.05, then clamp. 
-        # This turns 0.04 -> 0.00, but keeps 1.5 -> 1.45 (preserving the drought)
-        final_blend[col] = np.clip(final_blend[col] - 0.05, 0.0, 5.0).round(4)
+    #     # Shift down by 0.05, then clamp. 
+    #     # This turns 0.04 -> 0.00, but keeps 1.5 -> 1.45 (preserving the drought)
+    #     final_blend[col] = np.clip(final_blend[col] - 0.05, 0.0, 5.0).round(4)
         
-    file_name = "ENSEMBLE_64TFT_36LSTM_v2.csv"
-    final_blend.to_csv(sub_dir / file_name, index=False)
-    print(f"Generated your final submission file: {file_name}")
+    # file_name = "ENSEMBLE_64TFT_36LSTM_v2.csv"
+    # final_blend.to_csv(sub_dir / file_name, index=False)
+    # print(f"Generated your final submission file: {file_name}")
+
+    # ver 8
+    # super_tft = tft_42.copy()
+    # for col in pred_cols:
+    #     super_tft[col] = (tft_42[col] + tft_123[col] + tft_999[col]) / 3.0
+        
+    # # The Mathematical Sweet Spot: 64% TFT and 36% LSTM
+    # tft_weight = 0.85
+    # lstm_weight = 0.15
+    
+    # final_blend = super_tft.copy()
+    # for col in pred_cols:
+    #     final_blend[col] = (super_tft[col] * tft_weight) + (lstm[col] * lstm_weight)
+        
+    #     # # Post-processing squeeze
+    #     # final_blend[col] = np.where(final_blend[col] < 0.05, 0.0, final_blend[col])
+    #     # final_blend[col] = np.clip(final_blend[col], 0.0, 5.0).round(4)
+
+    #     # Shift down by 0.05, then clamp. 
+    #     # This turns 0.04 -> 0.00, but keeps 1.5 -> 1.45 (preserving the drought)
+    #     final_blend[col] = np.clip(final_blend[col] - 0.05, 0.0, 5.0).round(4)
+        
+    # file_name = "ENSEMBLE_85TFT_15LSTM_log.csv"
+    # final_blend.to_csv(sub_dir / file_name, index=False)
+    # print(f"Generated your final submission file: {file_name}")
+
+    #ver 9
+    # # Load your 0.8192 champion file
+    # final_blend = pd.read_csv("submissions/ENSEMBLE_64TFT_36LSTM.csv")
+    # pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
+
+    # for col in pred_cols:
+    #     # A tiny power exponent (e.g., 1.05) pushes 0.5 down to 0.47, 
+    #     # but leaves 4.0 mostly intact at 4.2 (which will get clipped back down)
+    #     final_blend[col] = np.power(final_blend[col], 1.05)
+    #     final_blend[col] = np.clip(final_blend[col], 0.0, 5.0).round(4)
+        
+    # final_blend.to_csv("submissions/ENSEMBLE_SQUEEZE_1.05.csv", index=False)
+
+    # ver 10
+    # Load your current 0.8192 champion
+    sub = pd.read_csv("submissions/ENSEMBLE_64TFT_36LSTM.csv")
+    
+    smoothed = sub.copy()
+    
+    # Extract the prediction arrays
+    w1 = sub["pred_week1"].values
+    w2 = sub["pred_week2"].values
+    w3 = sub["pred_week3"].values
+    w4 = sub["pred_week4"].values
+    w5 = sub["pred_week5"].values
+    
+    # Apply a mild 20% smoothing from neighboring weeks
+    # Week 1 only has Week 2 as a future neighbor
+    smoothed["pred_week1"] = (w1 * 0.8) + (w2 * 0.2)
+    
+    # Middle weeks pull 10% from the past and 10% from the future
+    smoothed["pred_week2"] = (w2 * 0.8) + (w1 * 0.1) + (w3 * 0.1)
+    smoothed["pred_week3"] = (w3 * 0.8) + (w2 * 0.1) + (w4 * 0.1)
+    smoothed["pred_week4"] = (w4 * 0.8) + (w3 * 0.1) + (w5 * 0.1)
+    
+    # Week 5 only has Week 4 as a past neighbor
+    smoothed["pred_week5"] = (w5 * 0.8) + (w4 * 0.2)
+    
+    # Re-apply the baseline Kaggle constraints
+    pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
+    for col in pred_cols:
+        smoothed[col] = np.where(smoothed[col] < 0.05, 0.0, smoothed[col])
+        smoothed[col] = np.clip(smoothed[col], 0.0, 5.0).round(4)
+        
+    smoothed.to_csv("submissions/SMOOTHED_64TFT_36LSTM.csv", index=False)
+    print("Saved smoothed predictions.")
 
     
 if __name__ == "__main__":

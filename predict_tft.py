@@ -30,6 +30,9 @@ def main():
     median_preds = quantile_preds[:, :, MEDIAN_QUANTILE_IDX]
     index_df = output.index.reset_index(drop=True)
 
+    # This brings the tiny logarithmic numbers back to the normal 0 to 5 scale
+    median_preds = np.expm1(median_preds)
+
     # THE RELU CLAMP
     median_preds = np.clip(median_preds, 0.0, 5.0)
 
@@ -48,9 +51,9 @@ def main():
 
     # DYNAMIC FILE NAMING BASED ON SEED
     if SEED == 42:
-        out_name = "submission_tft_v4_relu.csv"
+        out_name = "submission_tft_v4_relu_42_log.csv"
     else:
-        out_name = f"submission_tft_v4_relu_{SEED}.csv"
+        out_name = f"submission_tft_v4_relu_{SEED}_log.csv"
 
     out_path = SUBMISSION_DIR / out_name
     submission.to_csv(out_path, index=False)

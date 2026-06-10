@@ -92,6 +92,9 @@ def build_combined_frame(train_raw: pd.DataFrame, test_raw: pd.DataFrame) -> pd.
     combined["score"] = combined["score"].fillna(region_mean).astype(np.float32)
     combined["score"] = combined["score"].fillna(0.0).astype(np.float32)
 
+    # Transform the target to log(y+1) before the model ever sees it
+    combined["score"] = np.log1p(combined["score"]).astype(np.float32)
+
     combined = _add_calendar_features(combined)
 
     for c in WEEKLY_FEATURES:
