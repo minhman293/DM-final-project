@@ -51,9 +51,9 @@ def main():
 
     # DYNAMIC FILE NAMING BASED ON SEED
     if SEED == 42:
-        out_name = "submission_tft_v4_relu_42_log.csv"
+        out_name = "submission_tft_v4_relu_42_anomaly.csv"
     else:
-        out_name = f"submission_tft_v4_relu_{SEED}_log.csv"
+        out_name = f"submission_tft_v4_relu_{SEED}_anomaly.csv"
 
     out_path = SUBMISSION_DIR / out_name
     submission.to_csv(out_path, index=False)

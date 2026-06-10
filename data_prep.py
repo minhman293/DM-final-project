@@ -1,4 +1,3 @@
-# data_prep.py — V4 (The 7.5 Year Truncation)
 from __future__ import annotations
 import numpy as np
 import pandas as pd
@@ -19,7 +18,7 @@ def _aggregate_daily_to_weekly(daily: pd.DataFrame, is_train: bool) -> pd.DataFr
     weekly = daily.groupby([REGION_COL, "week_id"], sort=True).agg(**agg_dict).reset_index()
 
     for c in WEEKLY_FEATURES:
-        if c in weekly.columns and not c.startswith("delta_"):
+        if c in weekly.columns and not c.endswith("_anomaly") and not c.startswith("delta_"):
             weekly[c] = weekly[c].astype(np.float32)
     weekly["month"] = weekly["month"].astype(np.int8)
 
@@ -46,6 +45,11 @@ def build_combined_frame(train_raw: pd.DataFrame, test_raw: pd.DataFrame) -> pd.
 
     weekly_train = _aggregate_daily_to_weekly(train_raw, is_train=True)
     weekly_test = _aggregate_daily_to_weekly(test_raw, is_train=False)
+
+    # ---> COMPUTE CLIMATOLOGY (15-YEAR BASELINE) BEFORE TRUNCATION <---
+    core_features = ['prec_sum', 'tmp_mean', 'tmp_max_max', 'tmp_min_min']
+    climatology = weekly_train.groupby([REGION_COL, 'month'])[core_features].agg(['mean', 'std']).reset_index()
+    climatology.columns = [REGION_COL, 'month'] + [f"{feat}_{stat}" for feat in core_features for stat in ['mean', 'std']]
 
     # ---> THE GOLDEN TRUNCATION <---
     weekly_train = weekly_train.groupby(REGION_COL).tail(391).reset_index(drop=True)
@@ -92,8 +96,15 @@ def build_combined_frame(train_raw: pd.DataFrame, test_raw: pd.DataFrame) -> pd.
     combined["score"] = combined["score"].fillna(region_mean).astype(np.float32)
     combined["score"] = combined["score"].fillna(0.0).astype(np.float32)
 
-    # Transform the target to log(y+1) before the model ever sees it
-    combined["score"] = np.log1p(combined["score"]).astype(np.float32)
+    # REMOVED log1p Transformation (Restored normal scale)
+    
+    # ---> MERGE CLIMATOLOGY AND CALCULATE ANOMALIES <---
+    combined = combined.merge(climatology, on=[REGION_COL, 'month'], how='left')
+    for feat in core_features:
+        anomaly_col = f"{feat}_anomaly"
+        combined[anomaly_col] = (combined[feat] - combined[f"{feat}_mean"]) / (combined[f"{feat}_std"] + 1e-6)
+        combined = combined.drop(columns=[f"{feat}_mean", f"{feat}_std"])
+        combined[anomaly_col] = combined[anomaly_col].fillna(0.0).astype(np.float32)
 
     combined = _add_calendar_features(combined)
 

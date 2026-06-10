@@ -1,4 +1,3 @@
-# config_tft.py — V4 (The 0.8891 Baseline)
 from pathlib import Path
 
 DATA_DIR = Path("data")
@@ -21,13 +20,16 @@ METEO_COLS_DAILY = [
     "tmp_max", "tmp_min", "tmp_range", "surf_tmp", "wind", "wind_max", "wind_min", "wind_range"
 ]
 
-# THE PRISTINE 8 FEATURES (No EMA or Volatility)
+# ADDED: Raw temps and the 4 new Anomaly Z-Scores
 WEEKLY_FEATURES = [
     "surf_pre_mean", "tmp_range_mean", "wind_mean", "wind_max_max",
     "prec_sum", "humidity_mean",
-    "delta_prec", "delta_tmp_range"
+    "delta_prec", "delta_tmp_range",
+    "tmp_mean", "tmp_max_max", "tmp_min_min",
+    "prec_sum_anomaly", "tmp_mean_anomaly", "tmp_max_max_anomaly", "tmp_min_min_anomaly"
 ]
 
+# ADDED: Mean, Max, and Min aggregations for temperature
 WEEKLY_AGG_SPEC = {
     "prec_sum":        ("prec",       "sum"),
     "surf_pre_mean":   ("surf_pre",   "mean"),
@@ -35,6 +37,9 @@ WEEKLY_AGG_SPEC = {
     "tmp_range_mean":  ("tmp_range",  "mean"),
     "wind_mean":       ("wind",       "mean"),
     "wind_max_max":    ("wind_max",   "max"),
+    "tmp_mean":        ("tmp",        "mean"),
+    "tmp_max_max":     ("tmp_max",    "max"),
+    "tmp_min_min":     ("tmp_min",    "min"),
 }
 
 ENC_LEN = 26 
@@ -65,4 +70,4 @@ PRECISION = "16-mixed"
 PATCH_ATTENTION_FOR_FP16 = True 
 
 # SEED TO CHANGE (42 -> 123 -> 999)
-SEED = 999
+SEED = 42
