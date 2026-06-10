@@ -327,60 +327,38 @@ def main():
     # final_blend.to_csv("submissions/ENSEMBLE_SQUEEZE_1.05.csv", index=False)
 
     # ver 10 currently best
-    # # Load your current 0.8192 champion
-    # sub = pd.read_csv("submissions/ENSEMBLE_64TFT_36LSTM.csv")
+    # Load your current 0.8192 champion
+    sub = pd.read_csv("submissions/ENSEMBLE_64TFT_36LSTM.csv")
     
-    # smoothed = sub.copy()
+    smoothed = sub.copy()
     
-    # # Extract the prediction arrays
-    # w1 = sub["pred_week1"].values
-    # w2 = sub["pred_week2"].values
-    # w3 = sub["pred_week3"].values
-    # w4 = sub["pred_week4"].values
-    # w5 = sub["pred_week5"].values
+    # Extract the prediction arrays
+    w1 = sub["pred_week1"].values
+    w2 = sub["pred_week2"].values
+    w3 = sub["pred_week3"].values
+    w4 = sub["pred_week4"].values
+    w5 = sub["pred_week5"].values
     
-    # # Apply a mild 20% smoothing from neighboring weeks
-    # # Week 1 only has Week 2 as a future neighbor
-    # smoothed["pred_week1"] = (w1 * 0.8) + (w2 * 0.2)
+    # Apply a mild 20% smoothing from neighboring weeks
+    # Week 1 only has Week 2 as a future neighbor
+    smoothed["pred_week1"] = (w1 * 0.8) + (w2 * 0.2)
     
-    # # Middle weeks pull 10% from the past and 10% from the future
-    # smoothed["pred_week2"] = (w2 * 0.8) + (w1 * 0.1) + (w3 * 0.1)
-    # smoothed["pred_week3"] = (w3 * 0.8) + (w2 * 0.1) + (w4 * 0.1)
-    # smoothed["pred_week4"] = (w4 * 0.8) + (w3 * 0.1) + (w5 * 0.1)
+    # Middle weeks pull 10% from the past and 10% from the future
+    smoothed["pred_week2"] = (w2 * 0.8) + (w1 * 0.1) + (w3 * 0.1)
+    smoothed["pred_week3"] = (w3 * 0.8) + (w2 * 0.1) + (w4 * 0.1)
+    smoothed["pred_week4"] = (w4 * 0.8) + (w3 * 0.1) + (w5 * 0.1)
     
-    # # Week 5 only has Week 4 as a past neighbor
-    # smoothed["pred_week5"] = (w5 * 0.8) + (w4 * 0.2)
+    # Week 5 only has Week 4 as a past neighbor
+    smoothed["pred_week5"] = (w5 * 0.8) + (w4 * 0.2)
     
-    # # Re-apply the baseline Kaggle constraints
-    # pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
-    # for col in pred_cols:
-    #     smoothed[col] = np.where(smoothed[col] < 0.05, 0.0, smoothed[col])
-    #     smoothed[col] = np.clip(smoothed[col], 0.0, 5.0).round(4)
-        
-    # smoothed.to_csv("submissions/SMOOTHED_64TFT_36LSTM.csv", index=False)
-    # print("Saved smoothed predictions.")
-
-    # ver 11
-    print("Loading Finalists...")
-    # 1. Load the Deep Learning Champion (0.8189)
-    nn_sub = pd.read_csv("submissions/SMOOTHED_64TFT_36LSTM.csv")
-    
-    # 2. Load the Tree-Based Champion (0.8295)
-    tree_sub = pd.read_csv("submissions/LGBM_DEEP_MEMORY_V2.csv")
-    
+    # Re-apply the baseline Kaggle constraints
     pred_cols = ["pred_week1", "pred_week2", "pred_week3", "pred_week4", "pred_week5"]
-    final_sub = nn_sub.copy()
-    
-    print("Executing 60/40 Deep-Tree Ensemble...")
     for col in pred_cols:
-        # The 60/40 weighted average
-        final_sub[col] = (nn_sub[col] * 0.60) + (tree_sub[col] * 0.40)
+        smoothed[col] = np.where(smoothed[col] < 0.05, 0.0, smoothed[col])
+        smoothed[col] = np.clip(smoothed[col], 0.0, 5.0).round(4)
         
-        # Safe bounds
-        final_sub[col] = np.clip(final_sub[col], 0.0, 5.0).round(4)
-        
-    out_path = "submissions/NN_TREE_ENSEMBLE.csv"
-    final_sub.to_csv(out_path, index=False)
+    smoothed.to_csv("submissions/SMOOTHED_64TFT_36LSTM.csv", index=False)
+    print("Saved smoothed predictions.")
 
     
 if __name__ == "__main__":

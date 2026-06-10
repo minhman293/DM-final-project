@@ -1,126 +1,132 @@
-# Drought Severity Prediction — Group 17
+# DM-final-project
 
-Final project for Data Mining, Spring 2026.
-Public LB: **0.8273** — 70/30 blend of a Temporal Fusion Transformer and an LSTM.
+This repository contains code and artifacts for the time-series forecasting project using Temporal Fusion Transformer (TFT), LSTM variants, and LightGBM models. The project trains, evaluates, and blends multiple models and produces Kaggle-ready submission CSVs.
 
-> Replace `{ID}` above with your group number before submitting.
+**Quick links**
+- Training scripts: `train_tft.py`, `train_lstm.py`, `train.py`
+- Predict runner: `predict_tft.py`, `predict_lstm.py`, `lgbm_deep_memory_v2.py`
+- Ensemble helpers: `new_ensemble.py`, `ensemble.py`, `ensemble_final.py`
+- Configs: `config_tft.py`, `config_lstm.py`
+- Artifacts: `artifacts_tft/`, `models/`, `lightning_logs/`, `submissions/`
 
-## Environment
+**Repository structure (important files/folders)**
+- `data/` — input CSVs: `train.csv`, `test.csv`
+- `artifacts_tft/` — saved TFT checkpoints (tft_best*.ckpt) and cached dataset spec
+- `lightning_logs/` — PyTorch Lightning logs (each `version_*` folder contains `metrics.csv` and `hparams.yaml`)
+- `models/`, `models_lstm/`, `models_pipeline_b/` — stored model artifacts and metadata
+- `submissions/` — generated submission CSVs
+- `requirements.txt` — Python dependencies
 
-```
+Prerequisites
+- OS: tested on Windows and Linux
+- Python 3.8+ (Conda recommended)
+- GPU recommended for TFT training (NVIDIA + CUDA)
+
+Recommended Conda environment (example)
+```bash
+conda create -n gpu_env python=3.10 -y
+conda activate gpu_env
 pip install -r requirements.txt
 ```
+If you use an existing environment, ensure PyTorch, PyTorch Lightning and PyTorch Forecasting versions in `requirements.txt` are satisfied.
 
-Tested on Python 3.10 with a single CUDA GPU. The pipeline runs on CPU as well but training takes substantially longer.
+Configuration
+- Main TFT config is in `config_tft.py`. Important values:
+	- `ARTIFACT_DIR` — where checkpoints and `training_dataset.pkl` are saved (default `artifacts_tft`)
+	- `CHECKPOINT_PATH` — default path for the best checkpoint
+	- Batch sizes, seed, accelerator, devices, and precision options are also in the config file
+- To change hyperparameters, edit `config_tft.py` or other relevant config files before running.
 
-## Data layout
-
-Place the Kaggle files exactly here before running anything:
-
-```
-data/train.csv
-data/test.csv
-sample_submission.csv
-```
-
-## Reproduction — quick path (no training, ~1 minute)
-
-The four prediction CSVs that produced the 0.8273 blend are committed under `submissions/`:
-
-- `submission_tft_v4_relu.csv` — TFT seed 42
-- `submission_tft_v4_relu_123.csv` — TFT seed 123
-- `submission_tft_v4_relu_999.csv` — TFT seed 999
-- `submission_lstm_v2.csv` — LSTM v2
-
-To rebuild the ensemble file:
+Training (TFT)
+1. Prepare data (build combined frame and cached frames):
+```bash
+python train_tft.py
 
 ```
-python reproduce_best.py
+2. The `train_tft.py` scripts construct datasets with `utils_tft` and `data_prep.prepare()` and then call PyTorch Lightning `Trainer.fit()`.
+3. Checkpoints: ModelCheckpoint callback saves the best checkpoint to `artifacts_tft/tft_best*.ckpt` or `artifacts_tft/tft_best_seed{seed}.ckpt`.
+4. Logs: PyTorch Lightning writes human-readable logs to `lightning_logs/version_*/metrics.csv` and `hparams.yaml`.
+	 - Example: `lightning_logs/version_9/metrics.csv` contains per-step/epoch metrics like `train_loss`, `val_loss`, `val_MAE`, `val_RMSE`, `val_SMAPE`.
+	 - To find the latest training metrics CSV:
+```bash
+ls -1t lightning_logs | head
+# then open the newest version folder, e.g. lightning_logs/version_13/metrics.csv
 ```
 
-Output: `submissions/ensemble_70tft_30lstm.csv`. This is the file that scored 0.8273 on the public leaderboard.
+Training (LSTM, LightGBM)
+- LSTM training: `train_lstm.py` (weights in `models_lstm/`)
+- LightGBM / tree-based training artifacts: produced by `lgbm_deep_memory_v2.py` and saved under `submissions/` as CSV predictions.
 
-## Reproduction — full path (from scratch, ~3–4 hours on GPU)
+Producing predictions and submissions
+- TFT: `predict_tft.py` loads the latest `tft_best*.ckpt` from `artifacts_tft/`, loads `training_dataset.pkl`, builds a predict dataset and writes a submission CSV to `submissions/`.
+- LSTM: `predict_lstm.py` writes `submissions/submission_lstm_v2.csv` or similar.
+- Ensemble/Blend: `reproduce_best.py` and `run_all.py` show the expected blending strategy and how to combine model outputs into final ensemble submission files.
 
-Before running:
+Approaches and results
 
-1. Confirm `data/train.csv` and `data/test.csv` are in place.
-2. Open `config_lstm.py` and ensure `DATA_DIR = Path("data")` (not `data_local`).
+The table below summarizes the main model families and blends explored during the project, together with the public leaderboard score where available.
 
-Then:
+| # | Approach | Public LB |
+|---|---|---:|
+| 1 | Original LightGBM (no temporal features) | 1.0911 |
+| 2 | Pure TFT + anomaly features | 1.1962 |
+| 3 | Pure TFT with $q = 0.25$ quantile | 0.9393 |
+| 4 | Pure TFT, full training data | 0.9296 |
+| 5 | Pure LSTM | 0.9029 |
+| 6 | Pure TFT (truncated 391w, ReLU) | 0.8891 |
+| 7 | TFT + region_mean (70/30) | 0.8666 |
+| 8 | LightGBM + anomaly features | 0.8402 |
+| 9 | TFT + LSTM + region_mean (triple) | 0.8378 |
+| 10 | LightGBM + anomaly + memory features | 0.8295 |
+| 11 | TFT + LSTM (70/30) | 0.8273 |
+| 12 | TFT + LSTM + LGBM (50/25/25) | 0.8220 |
+| 13 | TFT + LSTM (64/36, smoothed) | 0.8189 |
+| 14 | MEGA_BLEND (DL 70 + LGBM 30) | 0.8142 |
+| 15 | HORIZON_MEGA_BLEND (gradient 0.60 to 0.80) | 0.8133 |
+| 16 | **HORIZON_AGGRESSIVE (0.50 to 0.85)** | **0.8129** |
 
+Notes:
+- The best overall public result in this list is **HORIZON_AGGRESSIVE (0.50 to 0.85)** at **0.8129**.
+- The earlier canonical blend used by `reproduce_best.py` is **TFT + LSTM (70/30)** at **0.8273**.
+- The approach names match the experimental lineage used in `new_ensemble.py` and the saved submission files in `submissions/`.
+
+Reproducing the official pipeline (full end-to-end)
+1. Ensure `data/train.csv` and `data/test.csv` are present.
+2. Steps:
+- Update SEED=42 in `config_tft.py`
+- Train three TFT seeds (example seeds used: 42, 123, 999):
+```bash
+python train_tft.py
+python predict_tft.py
 ```
-python run_all.py
+- Train LSTM and predict:
+```bash
+python train_lstm.py
+python predict_lstm.py
 ```
-
-This script will:
-
-1. Train 3 TFT seeds (42, 123, 999), writing one prediction CSV per seed.
-2. Train LSTM v2, copying its prediction into `submission_lstm_v2.csv`.
-3. Build the final blend: `0.70 × mean(3 TFT seeds) + 0.30 × LSTM v2`.
-
-Each step skips itself if its output CSV already exists, so the script is safe to rerun after partial failures.
-
-## Locked configuration
-
-| Component | Setting | Location |
-|---|---|---|
-| TFT target normalizer | `GroupNormalizer(transformation="relu")` | `train_tft.py` |
-| TFT encoder length | 26 weeks | `config_tft.py` |
-| TFT decoder length | 5 weeks | `config_tft.py` |
-| TFT training truncation | last 391 weeks per region | `data_prep.py` |
-| TFT seeds in ensemble | 42, 123, 999 | `run_all.py` |
-| LSTM data directory | `data` | `config_lstm.py` |
-| LSTM threshold squeezer | 0.4 | `config_lstm.py` |
-| Blend formula | `0.70 × mean(3 TFT) + 0.30 × LSTM`, rounded to 4 dp | `reproduce_best.py` |
-
-## File index
-
+- Train LGBM and predict:
+```bash
+python lgbm_deep_memory_v2.py
 ```
-.
-├── data/                  Kaggle CSVs (train.csv, test.csv)
-├── submissions/           output CSVs (4 source files + final blend committed)
-├── artifacts_tft/         TFT cached frame + checkpoints (created at runtime)
-├── models_lstm/           LSTM encoders, scaler, weights (created at runtime)
-│
-├── config_tft.py          TFT hyperparameters
-├── data_prep.py           daily → weekly + combined frame builder for TFT
-├── train_tft.py           single-seed TFT training (called via run_seed.py)
-├── predict_tft.py         single-seed TFT inference — see Known issues below
-├── utils_tft.py           logging helpers
-│
-├── config_lstm.py         LSTM hyperparameters
-├── feature_engineering.py weekly aggregation + lag/rolling features for LSTM
-├── dataset.py             PyTorch Dataset for LSTM
-├── model.py               LSTM architecture
-├── train_lstm.py          LSTM training
-├── predict_lstm.py        LSTM inference
-├── utils.py               shared utilities
-│
-├── ensemble.py            original blending experiments (kept for transparency)
-├── reproduce_best.py      rebuild the best submission from the 4 saved CSVs
-├── run_seed.py            train one TFT seed end-to-end (seed-aware naming)
-├── run_all.py             full from-scratch reproduction
-├── README.md              this file
-└── requirements.txt       Python dependencies
+- Build the ensemble:
+```bash
+python ensemble_final.py
+python new_ensemble.py
 ```
 
-## Known issues
+Where to find logs and readable metrics
+- Check `lightning_logs/version_*/metrics.csv` for CSV-formatted training metrics.
+- Hyperparameters and dataset encodings are in `lightning_logs/version_*/hparams.yaml` (useful to recreate data encoders and categorical mappings).
+- Checkpoints (binary) are in `artifacts_tft/` and `models/`.
 
-`predict_tft.py` contains a hardcoded checkpoint path (`tft_best-v5.ckpt`) from our local development environment. **Use `run_seed.py` instead** — it selects the right seed-specific checkpoint automatically.
-
-If you want to run `predict_tft.py` directly, change line ~57 from:
-
+Debugging and tips
+- CUDA OOM: reduce `BATCH_SIZE` or set `precision=16` in `config_tft.py`.
+- If metrics appear in a different Lightning `version_*` folder, open that folder and read `metrics.csv`.
+- To inspect the most recent metrics CSV programmatically:
 ```python
-ckpt = ARTIFACT_DIR / "tft_best-v5.ckpt"
+import pandas as pd
+from pathlib import Path
+v = sorted(Path('lightning_logs').iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)[0]
+print(v)
+print(pd.read_csv(v / 'metrics.csv').tail())
 ```
-
-to:
-
-```python
-ckpt = max(ckpt_candidates, key=lambda p: p.stat().st_mtime)
-```
-
-## Reference
-
-Temporal Fusion Transformer architecture: Lim, Bryan, et al. "Temporal fusion transformers for interpretable multi-horizon time series forecasting." *International Journal of Forecasting* 37.4 (2021): 1748–1764.
